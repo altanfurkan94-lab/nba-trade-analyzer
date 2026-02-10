@@ -51,7 +51,7 @@ st.title("🏀 NBA Fantasy Trade Analyzer")
 # --- AÇIKLAMA KISMI ---
 st.markdown("""
 <div class="intro-box">
-    "Bu sayfa değerli ligimizin değerli komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi ve daha az efor sarf etmeleri için oluşturulmuştur. Umarım ki yardımı dokunur."
+    "Bu sayfa değerli ligimizin değerli komisyonerlerinin ve üyelerinin takaslardaki farkları daha net şekilde görebilmesi ve daha az efor sarf etmeleri için oluşturulmuştur. Umarım ki yardımı dokunur."
 </div>
 """, unsafe_allow_html=True)
 
@@ -303,3 +303,4 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             if wins_a > wins_b: st.success(f"✅ **TAKIM A KAZANIR** ({wins_a} - {wins_b})")
             elif wins_b > wins_a: st.error(f"✅ **TAKIM B KAZANIR** ({wins_b} - {wins_a})")
             else: st.warning(f"⚖️ **BERABERLİK** ({wins_a} - {wins_b})")
+
