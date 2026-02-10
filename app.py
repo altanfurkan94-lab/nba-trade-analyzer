@@ -1,5 +1,25 @@
 import streamlit as st
+import subprocess
+import sys
+import time
+
+# --- ZORLA YÜKLEME BLOĞU (BU KISIM HATAYI ÇÖZECEK) ---
+# Streamlit sunucusu kütüphaneyi bulamazsa, kod çalışırken indirip kuracak.
+try:
+    import nba_api
+except ImportError:
+    st.warning("⚠️ Gerekli kütüphaneler (nba_api) sunucuya yükleniyor... Bu işlem 30-40 saniye sürebilir.")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "nba_api"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pandas"])
+    st.success("✅ Yükleme tamamlandı! Sayfa yenileniyor...")
+    time.sleep(1)
+    st.rerun()
+# -----------------------------------------------------
+
+# Kütüphaneler yüklendikten sonra diğerlerini çağırıyoruz
 import pandas as pd
+# analyzer'ı import etmeden önce kütüphanenin yüklü olduğundan emin olduk
 import analyzer
 import config
 import plotly.graph_objects as go
@@ -34,7 +54,6 @@ st.markdown("""
     
     .sidebar-list {background-color: #333; padding: 10px; border-radius: 5px; margin-bottom: 10px;}
     
-    /* Açıklama Kutusu Stili */
     .intro-box {
         background-color: #262730;
         padding: 15px;
@@ -49,10 +68,10 @@ st.markdown("""
 
 st.title("🏀 NBA Fantasy Trade Analyzer")
 
-# --- AÇIKLAMA KISMI (YENİ) ---
+# --- AÇIKLAMA KISMI ---
 st.markdown("""
 <div class="intro-box">
-    "Bu sayfa değerli ligimizin değerli komisyonerlerinin ve üyelerinin takaslardaki farkları daha net şekilde görebilmesi ve daha az efor sarf etmeleri için oluşturulmuştur. Umarım ki yardımı dokunur."
+    "Bu sayfa değerli ligimizin değerli komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi ve daha az efor sarf etmeleri için oluşturulmuştur. Umarım ki yardımı dokunur."
 </div>
 """, unsafe_allow_html=True)
 
