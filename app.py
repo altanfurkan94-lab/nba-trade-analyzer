@@ -1,25 +1,5 @@
 import streamlit as st
-import subprocess
-import sys
-import time
-
-# --- ZORLA YÜKLEME BLOĞU (BU KISIM HATAYI ÇÖZECEK) ---
-# Streamlit sunucusu kütüphaneyi bulamazsa, kod çalışırken indirip kuracak.
-try:
-    import nba_api
-except ImportError:
-    st.warning("⚠️ Gerekli kütüphaneler (nba_api) sunucuya yükleniyor... Bu işlem 30-40 saniye sürebilir.")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "nba_api"])
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pandas"])
-    st.success("✅ Yükleme tamamlandı! Sayfa yenileniyor...")
-    time.sleep(1)
-    st.rerun()
-# -----------------------------------------------------
-
-# Kütüphaneler yüklendikten sonra diğerlerini çağırıyoruz
 import pandas as pd
-# analyzer'ı import etmeden önce kütüphanenin yüklü olduğundan emin olduk
 import analyzer
 import config
 import plotly.graph_objects as go
