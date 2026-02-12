@@ -13,12 +13,13 @@ def get_team_roster(team_id):
 
 def get_player_stats(player_name, mode='LAST30'):
     try:
+        # Oyuncu ID bulma
         search = players.find_players_by_full_name(player_name)
         if not search: return None
         p_id = search[0]['id']
         
         if mode == 'SEASON':
-            # Sezon Geneli Verisi
+            # SEZON GENELİ
             stats = playercareerstats.PlayerCareerStats(player_id=p_id).get_data_frames()[0]
             if stats.empty: return None
             latest = stats.iloc[-1]
@@ -39,14 +40,18 @@ def get_player_stats(player_name, mode='LAST30'):
                 }
             }
         else:
-            # Son 30 Gün Verisi (Hata çıkaran kısım burasıydı, düzelttim)
+            # SON 30 GÜN (DÜZELTİLEN KISIM)
             dash = playerdashboardbygeneralsplits.PlayerDashboardByGeneralSplits(
                 player_id=p_id, last_n_days=30, per_mode_detailed='PerGame'
             ).get_data_frames()[0]
             
+            # Eğer oyuncu son 30 günde oynamadıysa tablo boş gelir, burada hata vermesini engelliyoruz:
             if dash.empty: return None
-            latest = dash.iloc[0]
             
+            latest = dash.iloc[0]
+            # Bazen GP 0 olsa bile satır gelebilir, kontrol edelim
+            if latest['GP'] == 0: return None
+
             return {
                 'id': p_id, 'name': player_name, 'games': int(latest['GP']),
                 'stats': {
@@ -60,7 +65,8 @@ def get_player_stats(player_name, mode='LAST30'):
                     'TOV': float(latest['TOV'])
                 }
             }
-    except:
+    except Exception as e:
+        # Herhangi bir hatada sistemi çökertmek yerine 'None' döndür
         return None
 
 def get_combined_stats(player_names, mode='LAST30'):
@@ -71,7 +77,7 @@ def get_combined_stats(player_names, mode='LAST30'):
         s = get_player_stats(name, mode)
         if s: all_stats.append(s)
         else: missing.append(name)
-        time.sleep(0.3) # NBA sunucusu bloklamasın diye minik bekleme
+        time.sleep(0.5) # NBA sunucusu bloklamasın diye azıcık bekletiyoruz
     
     if not all_stats: return {}, 0, [], missing
     
@@ -83,11 +89,10 @@ def get_combined_stats(player_names, mode='LAST30'):
         for cat in cats:
             combined[cat] += p['stats'][cat]
     
-    # Yüzdeleri isabet/deneme üzerinden tekrar, doğru şekilde hesapla
+    # Yüzdeleri isabet/deneme üzerinden tekrar hesapla
     combined['FG%'] = combined['FGM'] / combined['FGA'] if combined['FGA'] > 0 else 0
     combined['FT%'] = combined['FTM'] / combined['FTA'] if combined['FTA'] > 0 else 0
     
-    # Basit bir puan skoru (Fantezi değerine göre)
     score = (combined['PTS']*1.0 + combined['REB']*1.2 + combined['AST']*1.5 + 
              combined['STL']*3 + combined['BLK']*3 - combined['TOV']*2)
     
