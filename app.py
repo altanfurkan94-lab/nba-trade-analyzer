@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# --- ARKA KAPI KURULUMU ---
+# --- KÜTÜPHANE YÜKLEME ---
 try:
     import nba_api
 except ImportError:
@@ -15,19 +15,18 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="NBA Trade Analyzer", layout="wide")
 
-# --- CSS STİL (ESKİ GÜZEL GÖRÜNÜM) ---
+# --- CSS STİL ---
 st.markdown("""
 <style>
     thead tr th:first-child {display:none}
     tbody th {display:none}
     .stDataFrame {font-size: 1.1rem;}
-    /* Fotoğrafları büyük yapan stil */
     .player-card {
-        background-color: #262730; 
-        border-radius: 10px; 
-        padding: 0px; 
-        text-align: center; 
-        margin-bottom: 20px; 
+        background-color: #262730;
+        border-radius: 10px;
+        padding: 0px; /* Fotoğraf tam sığsın diye */
+        text-align: center;
+        margin-bottom: 20px;
         border: 1px solid #444;
         overflow: hidden;
     }
@@ -47,26 +46,16 @@ st.markdown("""
     .badge-glass {background-color: #fdcb6e; color: black;}
     
     .intro-box {
-        background-color: #262730;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 5px solid #ff4b4b;
-        margin-bottom: 25px;
-        font-style: italic;
-        color: #e0e0e0;
+        background-color: #262730; padding: 15px; border-radius: 8px;
+        border-left: 5px solid #ff4b4b; margin-bottom: 25px; font-style: italic; color: #e0e0e0;
     }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("🏀 NBA Fantasy Trade Analyzer")
+st.markdown('<div class="intro-box">"Bu sayfa değerli ligimizin değerli üyelerinin ve komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi için oluşturulmuştur. Umarım ki yardımı dokunur."</div>', unsafe_allow_html=True)
 
-st.markdown("""
-<div class="intro-box">
-    "Bu sayfa değerli ligimizin değerli üyelerinin ve komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi için oluşturulmuştur. Umarım ki yardımı dokunur."
-</div>
-""", unsafe_allow_html=True)
-
-# Session State
+# LİSTELERİ SIFIRLAMA (Hafıza)
 if 'team_a_package' not in st.session_state: st.session_state.team_a_package = []
 if 'team_b_package' not in st.session_state: st.session_state.team_b_package = []
 
@@ -78,40 +67,63 @@ def load_nba_teams():
 nba_teams_dict = load_nba_teams()
 team_names = sorted(list(nba_teams_dict.keys()))
 
-# --- SIDEBAR (ESKİ KUTUCUKLU SİSTEM) ---
+# --- SIDEBAR ---
 st.sidebar.header("🛠️ Ayarlar")
 analysis_mode = st.sidebar.radio("Analiz Aralığı:", ("Sezon Geneli", "Son 30 Gün"), index=1)
 mode_code = 'LAST30' if analysis_mode == "Son 30 Gün" else 'SEASON'
 
 st.sidebar.divider()
 
-# TAKIM A (MULTISELECT)
+# --- TAKIM A (EKLE BUTONLU SİSTEM) ---
 st.sidebar.markdown("### 🟢 Takım A (Gidenler)")
 team_a_select = st.sidebar.selectbox("Takım Seç (A)", team_names, key="sel_a")
 roster_a = analyzer.get_team_roster(nba_teams_dict[team_a_select])
-# İşte o eski güzel kutucuklu yapı:
-team_a_package = st.sidebar.multiselect("Oyuncuları Seç (A):", roster_a, key="multi_a")
+player_to_add_a = st.sidebar.selectbox("Oyuncu Seç:", roster_a, key="player_a")
+
+if st.sidebar.button("➕ Listeye Ekle (A)", key="btn_add_a"):
+    if player_to_add_a not in st.session_state.team_a_package:
+        st.session_state.team_a_package.append(player_to_add_a)
+        st.rerun()
+
+st.sidebar.markdown("**📦 Paket A Listesi:**")
+if st.session_state.team_a_package:
+    for p in st.session_state.team_a_package: st.sidebar.markdown(f"- {p}")
+    # Silme işlemi
+    rem_a = st.sidebar.selectbox("Çıkar (A):", ["Seçiniz..."]+st.session_state.team_a_package, key="rem_a")
+    if st.sidebar.button("🗑️ Sil (A)", key="del_a"):
+        if rem_a != "Seçiniz...": st.session_state.team_a_package.remove(rem_a); st.rerun()
+    if st.sidebar.button("❌ Temizle (A)", key="clr_a"): st.session_state.team_a_package=[]; st.rerun()
 
 st.sidebar.markdown("---")
 
-# TAKIM B (MULTISELECT)
+# --- TAKIM B (EKLE BUTONLU SİSTEM) ---
 st.sidebar.markdown("### 🔵 Takım B (Gelenler)")
 team_b_select = st.sidebar.selectbox("Takım Seç (B)", team_names, index=1, key="sel_b")
 roster_b = analyzer.get_team_roster(nba_teams_dict[team_b_select])
-# İşte o eski güzel kutucuklu yapı:
-team_b_package = st.sidebar.multiselect("Oyuncuları Seç (B):", roster_b, key="multi_b")
+player_to_add_b = st.sidebar.selectbox("Oyuncu Seç:", roster_b, key="player_b")
+
+if st.sidebar.button("➕ Listeye Ekle (B)", key="btn_add_b"):
+    if player_to_add_b not in st.session_state.team_b_package:
+        st.session_state.team_b_package.append(player_to_add_b)
+        st.rerun()
+
+st.sidebar.markdown("**📦 Paket B Listesi:**")
+if st.session_state.team_b_package:
+    for p in st.session_state.team_b_package: st.sidebar.markdown(f"- {p}")
+    # Silme işlemi
+    rem_b = st.sidebar.selectbox("Çıkar (B):", ["Seçiniz..."]+st.session_state.team_b_package, key="rem_b")
+    if st.sidebar.button("🗑️ Sil (B)", key="del_b"):
+        if rem_b != "Seçiniz...": st.session_state.team_b_package.remove(rem_b); st.rerun()
+    if st.sidebar.button("❌ Temizle (B)", key="clr_b"): st.session_state.team_b_package=[]; st.rerun()
 
 st.sidebar.divider()
-
-# Punt
 with st.sidebar.expander("🚫 Punt Stratejisi"):
     punt_cats = []
-    cats = ['FG%', 'FT%', '3PTM', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']
+    cats_all = ['FG%', 'FT%', '3PTM', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']
     c1, c2 = st.columns(2)
-    for c in cats:
+    for c in cats_all:
         if st.checkbox(f"Punt {c}"): punt_cats.append(c)
 
-# Rozet Fonksiyonu
 def get_badges_html(stats):
     b = []
     if stats['PTS']>=24: b.append(f"<span class='badge badge-scorer'>🔥 {stats['PTS']:.0f} PTS</span>")
@@ -121,7 +133,6 @@ def get_badges_html(stats):
     if stats['REB']>=10.0: b.append(f"<span class='badge badge-glass'>🦍 {stats['REB']:.0f} REB</span>")
     return "".join(b)
 
-# Grafikler
 def plot_radar_chart(stats_a, stats_b, categories):
     vals_a, vals_b = [], []
     valid_cats = [c for c in categories if c not in punt_cats]
@@ -159,16 +170,19 @@ def plot_gauge_chart(score_a, score_b):
     fig.update_layout(height=250, margin=dict(l=20,r=20,t=30,b=20), paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
     return fig
 
-# --- ANA İŞLEM (ANALİZ ET) ---
+# --- ANALİZ İŞLEMİ ---
 if st.sidebar.button("ANALİZ ET", type="primary"):
-    if not team_a_package or not team_b_package:
-        st.error("Lütfen her iki taraftan da oyuncu seç kral!")
+    side_a = st.session_state.team_a_package
+    side_b = st.session_state.team_b_package
+    
+    if not side_a or not side_b:
+        st.error("Her iki taraftan da en az bir oyuncu eklemelisin!")
     else:
         with st.spinner(f'{analysis_mode} verileri analiz ediliyor...'):
-            stats_a, score_a, players_a, missing_a = analyzer.get_combined_stats(team_a_package, mode=mode_code)
-            stats_b, score_b, players_b, missing_b = analyzer.get_combined_stats(team_b_package, mode_code)
+            stats_a, score_a, players_a, missing_a = analyzer.get_combined_stats(side_a, mode=mode_code)
+            stats_b, score_b, players_b, missing_b = analyzer.get_combined_stats(side_b, mode=mode_code)
 
-            # 1. KARTLAR (BÜYÜK FOTOĞRAFLI)
+            # 1. KARTLAR (BÜYÜK FOTO)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"<h3 style='text-align:center; color:#1f77b4'>GIDENLER (Takım A)</h3>", unsafe_allow_html=True)
@@ -201,23 +215,21 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             # 2. GRAFİKLER
             g1, g2 = st.columns([1,1.5])
             with g1: st.plotly_chart(plot_gauge_chart(score_a, score_b), use_container_width=True)
-            with g2: st.plotly_chart(plot_radar_chart(stats_a, stats_b, cats), use_container_width=True)
-            
+            with g2: st.plotly_chart(plot_radar_chart(stats_a, stats_b, cats_all), use_container_width=True)
+
             # 3. NET DEĞİŞİM (+/-)
             st.subheader("📈 Net Değişim")
             delta_cols = st.columns(9)
             wins_a, wins_b = 0, 0
-            for idx, cat in enumerate(cats):
+            for idx, cat in enumerate(cats_all):
                 if cat in punt_cats: continue
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
                 diff = val_a - val_b
-                # TOV için farkı tersine çevir (daha az TOV iyidir)
-                if cat == 'TOV': diff = val_b - val_a # Bu sadece ekranda kırmızı/yeşil göstermek için
+                if cat == 'TOV': diff = val_b - val_a
                 
-                fmt_diff = f"{val_a-val_b:+.1f}" # Değeri normal hesapla
+                fmt_diff = f"{val_a-val_b:+.1f}"
                 if cat in ['FG%', 'FT%']: fmt_diff = f"{(val_a-val_b)*100:+.1f}%"
                 
-                # Renk mantığı
                 is_pos = (val_a > val_b) if cat != 'TOV' else (val_a < val_b)
                 
                 with delta_cols[idx]:
@@ -225,14 +237,14 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
 
             st.divider()
 
-            # 4. TABLO (İSABETLER EKLENDİ)
-            ct, cc = st.columns([1.5, 0.1]) # Tabloyu genişlettim
+            # 4. TABLO (İSABET/DENEME EKLİ)
+            ct, cc = st.columns([1.5, 0.1])
             data = []
-            for cat in cats:
+            for cat in cats_all:
                 is_punted = cat in punt_cats
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
                 
-                # --- İSABET/DENEME BURADA ---
+                # İSABET GÖSTERGESİ
                 if cat == 'FG%':
                     str_a = f"%{val_a*100:.1f} ({stats_a.get('FGM',0):.1f}/{stats_a.get('FGA',0):.1f})"
                     str_b = f"%{val_b*100:.1f} ({stats_b.get('FGM',0):.1f}/{stats_b.get('FGA',0):.1f})"
@@ -241,7 +253,6 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
                     str_b = f"%{val_b*100:.1f} ({stats_b.get('FTM',0):.1f}/{stats_b.get('FTA',0):.1f})"
                 else:
                     str_a, str_b = f"{val_a:.1f}", f"{val_b:.1f}"
-                # ---------------------------
 
                 if not is_punted:
                     if cat == 'TOV': winner = "Takım A" if val_a < val_b else "Takım B"
