@@ -1,116 +1,149 @@
 from nba_api.stats.static import players, teams
-from nba_api.stats.endpoints import playercareerstats, playergamelog
-import pandas as pd
+from nba_api.stats.endpoints import playergamelog, commonteamroster
+import unicodedata
+import config
 import time
 from datetime import datetime, timedelta
+import pandas as pd
 
-# NBA Bizi Bot Sanmasın Diye Kimlik Kartı (Headers)
-custom_headers = {
-    'Host': 'stats.nba.com',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Origin': 'https://www.nba.com',
-    'Connection': 'keep-alive',
-    'Referer': 'https://www.nba.com/',
-}
+# Önbellekler
+player_cache = {}
+roster_cache = {}
+
+def normalize_text(text):
+    text = text.lower()
+    normalized = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8')
+    return normalized
 
 def get_all_nba_teams():
     return teams.get_teams()
 
 def get_team_roster(team_id):
-    from nba_api.stats.endpoints import commonteamroster
+    if team_id in roster_cache: return roster_cache[team_id]
     try:
-        roster = commonteamroster.CommonTeamRoster(team_id=team_id, headers=custom_headers).get_data_frames()[0]
-        return roster['PLAYER'].tolist()
-    except:
+        roster = commonteamroster.CommonTeamRoster(team_id=team_id, season=config.CURRENT_SEASON_ID)
+        df = roster.get_data_frames()[0]
+        player_list = df['PLAYER'].tolist()
+        roster_cache[team_id] = player_list
+        return player_list
+    except Exception as e:
         return []
 
-def get_player_stats(player_name, mode='LAST30'):
-    try:
-        time.sleep(0.6) # Seri istek atıp ban yememek için bekletiyoruz
-        
-        search = players.find_players_by_full_name(player_name)
-        if not search: return None
-        p_id = search[0]['id']
-        
-        # --- SEZON GENELİ ---
-        if mode == 'SEASON':
-            stats = playercareerstats.PlayerCareerStats(player_id=p_id, headers=custom_headers).get_data_frames()[0]
-            if stats.empty: return None
-            latest = stats.iloc[-1]
-            gp = float(latest['GP'])
-            if gp == 0: return None
+def get_player_id(name_input):
+    if name_input in player_cache: return player_cache[name_input]
+    active_players = players.get_active_players()
+    search_key = normalize_text(name_input)
+    best_match = None
+    for p in active_players:
+        db_name_clean = normalize_text(p['full_name'])
+        if db_name_clean == search_key:
+            player_cache[name_input] = p['id']
+            return p['id']
+        if search_key in db_name_clean:
+            if best_match is None: best_match = p['id']
+    if best_match:
+        player_cache[name_input] = best_match
+        return best_match
+    return None
+
+def get_combined_stats(player_names_list, mode='SEASON'):
+    total_stats = {
+        'PTS': 0, 'REB': 0, 'AST': 0, 'STL': 0, 'BLK': 0, 
+        '3PTM': 0, 'TOV': 0, 'FGA': 0, 'FGM': 0, 'FTA': 0, 'FTM': 0
+    }
+    
+    valid_players = [] 
+    missing_players = [] 
+    
+    today = datetime.now()
+    cutoff_date = today - timedelta(days=30)
+
+    for name in player_names_list:
+        if not name.strip(): continue 
+        pid = get_player_id(name)
+        if not pid:
+            missing_players.append(f"{name} (Bulunamadı)")
+            continue
             
-            return {
-                'id': p_id, 'name': player_name, 'games': int(gp),
-                'stats': {
-                    'FG%': float(latest['FG_PCT']), 
-                    'FGM': float(latest['FGM'])/gp, 'FGA': float(latest['FGA'])/gp,
-                    'FT%': float(latest['FT_PCT']), 
-                    'FTM': float(latest['FTM'])/gp, 'FTA': float(latest['FTA'])/gp,
-                    '3PTM': float(latest['FG3M'])/gp, 'PTS': float(latest['PTS'])/gp, 
-                    'REB': float(latest['REB'])/gp, 'AST': float(latest['AST'])/gp, 
-                    'STL': float(latest['STL'])/gp, 'BLK': float(latest['BLK'])/gp, 
-                    'TOV': float(latest['TOV'])/gp
-                }
+        try:
+            time.sleep(0.3) 
+            gamelog = playergamelog.PlayerGameLog(player_id=pid, season=config.CURRENT_SEASON_ID)
+            df = gamelog.get_data_frames()[0]
+            
+            if df.empty:
+                missing_players.append(f"{name} (Veri Yok)")
+                continue
+            
+            working_df = df
+            if mode == 'LAST30':
+                df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
+                df_filtered = df[df['GAME_DATE'] >= cutoff_date]
+                if df_filtered.empty:
+                    missing_players.append(f"{name} (Son 30 gün boş)")
+                    continue
+                working_df = df_filtered
+
+            # ORTALAMALAR
+            games = len(working_df)
+            p_pts = working_df['PTS'].sum() / games
+            p_reb = working_df['REB'].sum() / games
+            p_ast = working_df['AST'].sum() / games
+            p_stl = working_df['STL'].sum() / games
+            p_blk = working_df['BLK'].sum() / games
+            p_3pt = working_df['FG3M'].sum() / games
+            p_tov = working_df['TOV'].sum() / games
+            
+            # Toplamlara Ekle
+            total_stats['PTS'] += p_pts
+            total_stats['REB'] += p_reb
+            total_stats['AST'] += p_ast
+            total_stats['STL'] += p_stl
+            total_stats['BLK'] += p_blk
+            total_stats['3PTM'] += p_3pt
+            total_stats['TOV'] += p_tov
+            
+            total_stats['FGA'] += working_df['FGA'].sum() / games
+            total_stats['FGM'] += working_df['FGM'].sum() / games
+            total_stats['FTA'] += working_df['FTA'].sum() / games
+            total_stats['FTM'] += working_df['FTM'].sum() / games
+            
+            real_name = players.find_player_by_id(pid)['full_name']
+            
+            # --- YENİLİK: Bireysel İstatistikleri Kaydet ---
+            # Bu verileri rozet (badge) sistemi için kullanacağız
+            player_stats_summary = {
+                'PTS': p_pts, 'REB': p_reb, 'AST': p_ast,
+                'STL': p_stl, 'BLK': p_blk, '3PTM': p_3pt, 'TOV': p_tov
             }
             
-        # --- SON 30 GÜN (Manuel Hesaplama - En Garantisi) ---
-        else:
-            gamelog = playergamelog.PlayerGameLog(player_id=p_id, season='2024-25', headers=custom_headers).get_data_frames()[0]
+            valid_players.append({
+                'name': real_name, 
+                'id': pid, 
+                'games': games,
+                'stats': player_stats_summary
+            })
             
-            # Eğer son 30 gün verisi çekilemezse, çökmemek için SEZON verisini döndür (FALLBACK)
-            if gamelog.empty:
-                return get_player_stats(player_name, mode='SEASON')
+        except Exception as e:
+            print(f"Hata ({name}): {e}")
+            missing_players.append(f"{name} (Hata)")
 
-            gamelog['GAME_DATE'] = pd.to_datetime(gamelog['GAME_DATE'], format='%b %d, %Y')
-            thirty_days_ago = datetime.now() - timedelta(days=30)
-            recent_games = gamelog[gamelog['GAME_DATE'] >= thirty_days_ago]
-            
-            if recent_games.empty:
-                return get_player_stats(player_name, mode='SEASON')
-            
-            gp = len(recent_games)
-            mean_stats = recent_games.mean(numeric_only=True)
-            
-            return {
-                'id': p_id, 'name': player_name, 'games': gp,
-                'stats': {
-                    'FG%': float(mean_stats['FG_PCT']), 
-                    'FGM': float(mean_stats['FGM']), 'FGA': float(mean_stats['FGA']),
-                    'FT%': float(mean_stats['FT_PCT']), 
-                    'FTM': float(mean_stats['FTM']), 'FTA': float(mean_stats['FTA']),
-                    '3PTM': float(mean_stats['FG3M']), 'PTS': float(mean_stats['PTS']), 
-                    'REB': float(mean_stats['REB']), 'AST': float(mean_stats['AST']), 
-                    'STL': float(mean_stats['STL']), 'BLK': float(mean_stats['BLK']), 
-                    'TOV': float(mean_stats['TOV'])
-                }
-            }
-    except:
-        return None
+    if total_stats['FGA'] > 0: total_stats['FG%'] = total_stats['FGM'] / total_stats['FGA']
+    else: total_stats['FG%'] = 0.0
+        
+    if total_stats['FTA'] > 0: total_stats['FT%'] = total_stats['FTM'] / total_stats['FTA']
+    else: total_stats['FT%'] = 0.0
 
-def get_combined_stats(player_names, mode='LAST30'):
-    all_stats = []
-    missing = []
+    score = 0
+    score += total_stats['PTS'] * config.WEIGHTS['PTS']
+    score += total_stats['REB'] * config.WEIGHTS['REB']
+    score += total_stats['AST'] * config.WEIGHTS['AST']
+    score += total_stats['STL'] * config.WEIGHTS['STL']
+    score += total_stats['BLK'] * config.WEIGHTS['BLK']
+    score += total_stats['3PTM'] * config.WEIGHTS['FG3M']
+    score += total_stats['TOV'] * config.WEIGHTS['TOV']
     
-    for name in player_names:
-        s = get_player_stats(name, mode)
-        if s: all_stats.append(s)
-        else: missing.append(name)
-    
-    if not all_stats: return {}, 0, [], missing
-    
-    cats = ['FGM', 'FGA', 'FTM', 'FTA', '3PTM', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']
-    combined = {cat: 0 for cat in cats}
-    
-    for p in all_stats:
-        for cat in cats: combined[cat] += p['stats'][cat]
-    
-    combined['FG%'] = combined['FGM'] / combined['FGA'] if combined['FGA'] > 0 else 0
-    combined['FT%'] = combined['FTM'] / combined['FTA'] if combined['FTA'] > 0 else 0
-    
-    score = (combined['PTS']*1.0 + combined['REB']*1.2 + combined['AST']*1.5 + 
-             combined['STL']*3 + combined['BLK']*3 - combined['TOV']*2)
-    
-    return combined, score, all_stats, missing
+    fg_impact = (total_stats['FG%'] - config.LEAGUE_BASE['FG_PCT']) * total_stats['FGA'] * config.PERCENTAGE_WEIGHT
+    ft_impact = (total_stats['FT%'] - config.LEAGUE_BASE['FT_PCT']) * total_stats['FTA'] * config.PERCENTAGE_WEIGHT
+    score += fg_impact + ft_impact
+
+    return total_stats, round(score, 2), valid_players, missing_players
