@@ -18,11 +18,13 @@ def get_player_stats(player_name, mode='LAST30'):
         p_id = search[0]['id']
         
         if mode == 'SEASON':
+            # Sezon Geneli Verisi
             stats = playercareerstats.PlayerCareerStats(player_id=p_id).get_data_frames()[0]
             if stats.empty: return None
             latest = stats.iloc[-1]
             gp = float(latest['GP'])
             if gp == 0: return None
+            
             return {
                 'id': p_id, 'name': player_name, 'games': int(gp),
                 'stats': {
@@ -37,9 +39,14 @@ def get_player_stats(player_name, mode='LAST30'):
                 }
             }
         else:
-            dash = playerdashboardbygeneralsplits.PlayerDashboardByGeneralSplits(player_id=p_id, last_n_days=30, per_mode_detailed='PerGame').get_data_frames()[0]
+            # Son 30 Gün Verisi (Hata çıkaran kısım burasıydı, düzelttim)
+            dash = playerdashboardbygeneralsplits.PlayerDashboardByGeneralSplits(
+                player_id=p_id, last_n_days=30, per_mode_detailed='PerGame'
+            ).get_data_frames()[0]
+            
             if dash.empty: return None
             latest = dash.iloc[0]
+            
             return {
                 'id': p_id, 'name': player_name, 'games': int(latest['GP']),
                 'stats': {
@@ -53,27 +60,35 @@ def get_player_stats(player_name, mode='LAST30'):
                     'TOV': float(latest['TOV'])
                 }
             }
-    except: return None
+    except:
+        return None
 
 def get_combined_stats(player_names, mode='LAST30'):
     all_stats = []
     missing = []
+    
     for name in player_names:
         s = get_player_stats(name, mode)
         if s: all_stats.append(s)
         else: missing.append(name)
-        time.sleep(0.3)
+        time.sleep(0.3) # NBA sunucusu bloklamasın diye minik bekleme
     
     if not all_stats: return {}, 0, [], missing
     
+    # Toplamları hesapla
     cats = ['FGM', 'FGA', 'FTM', 'FTA', '3PTM', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']
     combined = {cat: 0 for cat in cats}
-    for p in all_stats:
-        for cat in cats: combined[cat] += p['stats'][cat]
     
-    # Yüzdeleri matematiksel olarak doğru hesapla
+    for p in all_stats:
+        for cat in cats:
+            combined[cat] += p['stats'][cat]
+    
+    # Yüzdeleri isabet/deneme üzerinden tekrar, doğru şekilde hesapla
     combined['FG%'] = combined['FGM'] / combined['FGA'] if combined['FGA'] > 0 else 0
     combined['FT%'] = combined['FTM'] / combined['FTA'] if combined['FTA'] > 0 else 0
     
-    score = (combined['PTS']*1.0 + combined['REB']*1.2 + combined['AST']*1.5 + combined['STL']*3 + combined['BLK']*3 - combined['TOV']*2)
+    # Basit bir puan skoru (Fantezi değerine göre)
+    score = (combined['PTS']*1.0 + combined['REB']*1.2 + combined['AST']*1.5 + 
+             combined['STL']*3 + combined['BLK']*3 - combined['TOV']*2)
+    
     return combined, score, all_stats, missing
