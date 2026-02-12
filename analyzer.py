@@ -1,7 +1,8 @@
 from nba_api.stats.static import players, teams
-from nba_api.stats.endpoints import playercareerstats, playerdashboardbygeneralsplits
+from nba_api.stats.endpoints import playercareerstats, playergamelog
 import pandas as pd
 import time
+from datetime import datetime, timedelta
 
 def get_all_nba_teams():
     return teams.get_teams()
@@ -13,13 +14,11 @@ def get_team_roster(team_id):
 
 def get_player_stats(player_name, mode='LAST30'):
     try:
-        # Oyuncu ID'sini bul
         search = players.find_players_by_full_name(player_name)
         if not search: return None
         p_id = search[0]['id']
         
         if mode == 'SEASON':
-            # SEZON VERİSİ
             stats = playercareerstats.PlayerCareerStats(player_id=p_id).get_data_frames()[0]
             if stats.empty: return None
             latest = stats.iloc[-1]
@@ -40,31 +39,33 @@ def get_player_stats(player_name, mode='LAST30'):
                 }
             }
         else:
-            # SON 30 GÜN VERİSİ
-            # Burası bazen boş geliyor, siteyi çökerten yer burasıydı.
-            dash = playerdashboardbygeneralsplits.PlayerDashboardByGeneralSplits(
-                player_id=p_id, last_n_days=30, per_mode_detailed='PerGame'
-            ).get_data_frames()[0]
+            # SON 30 GÜN (MANUEL HESAPLAMA - EN SAĞLAMI)
+            gamelog = playergamelog.PlayerGameLog(player_id=p_id, season='2024-25').get_data_frames()[0]
+            if gamelog.empty: return None
+
+            gamelog['GAME_DATE'] = pd.to_datetime(gamelog['GAME_DATE'], format='%b %d, %Y')
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            recent_games = gamelog[gamelog['GAME_DATE'] >= thirty_days_ago]
             
-            # KORUMA KALKANI: Eğer veri boşsa (empty) siteyi patlatma, None dön.
-            if dash.empty: return None
+            if recent_games.empty: return None
             
-            latest = dash.iloc[0]
+            gp = len(recent_games)
+            mean_stats = recent_games.mean(numeric_only=True)
+            
             return {
-                'id': p_id, 'name': player_name, 'games': int(latest['GP']),
+                'id': p_id, 'name': player_name, 'games': gp,
                 'stats': {
-                    'FG%': float(latest['FG_PCT']), 
-                    'FGM': float(latest['FGM']), 'FGA': float(latest['FGA']),
-                    'FT%': float(latest['FT_PCT']), 
-                    'FTM': float(latest['FTM']), 'FTA': float(latest['FTA']),
-                    '3PTM': float(latest['FG3M']), 'PTS': float(latest['PTS']), 
-                    'REB': float(latest['REB']), 'AST': float(latest['AST']), 
-                    'STL': float(latest['STL']), 'BLK': float(latest['BLK']), 
-                    'TOV': float(latest['TOV'])
+                    'FG%': float(mean_stats['FG_PCT']), 
+                    'FGM': float(mean_stats['FGM']), 'FGA': float(mean_stats['FGA']),
+                    'FT%': float(mean_stats['FT_PCT']), 
+                    'FTM': float(mean_stats['FTM']), 'FTA': float(mean_stats['FTA']),
+                    '3PTM': float(mean_stats['FG3M']), 'PTS': float(mean_stats['PTS']), 
+                    'REB': float(mean_stats['REB']), 'AST': float(mean_stats['AST']), 
+                    'STL': float(mean_stats['STL']), 'BLK': float(mean_stats['BLK']), 
+                    'TOV': float(mean_stats['TOV'])
                 }
             }
     except:
-        # Ne olursa olsun siteyi çökertme
         return None
 
 def get_combined_stats(player_names, mode='LAST30'):
@@ -75,7 +76,7 @@ def get_combined_stats(player_names, mode='LAST30'):
         s = get_player_stats(name, mode)
         if s: all_stats.append(s)
         else: missing.append(name)
-        time.sleep(0.3) 
+        time.sleep(0.3)
     
     if not all_stats: return {}, 0, [], missing
     
@@ -83,10 +84,8 @@ def get_combined_stats(player_names, mode='LAST30'):
     combined = {cat: 0 for cat in cats}
     
     for p in all_stats:
-        for cat in cats:
-            combined[cat] += p['stats'][cat]
+        for cat in cats: combined[cat] += p['stats'][cat]
     
-    # Yüzdeleri hesapla
     combined['FG%'] = combined['FGM'] / combined['FGA'] if combined['FGA'] > 0 else 0
     combined['FT%'] = combined['FTM'] / combined['FTA'] if combined['FTA'] > 0 else 0
     
