@@ -1,18 +1,5 @@
 import streamlit as st
 import os
-
-# --- KESİN ÇÖZÜM: ARKA KAPIDAN KURULUM ---
-try:
-    import nba_api
-except ImportError:
-    os.system("pip install nba_api pandas plotly")
-    st.rerun()
-
-import pandas as pd
-import analyzer
-import config
-import plotly.graph_objects as go
-
 st.set_page_config(page_title="NBA Trade Analyzer", layout="wide")
 
 # --- CSS STİL ---
@@ -321,3 +308,4 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             if wins_a > wins_b: st.success(f"✅ **TAKIM A KAZANIR** ({wins_a} - {wins_b})")
             elif wins_b > wins_a: st.error(f"✅ **TAKIM B KAZANIR** ({wins_b} - {wins_a})")
             else: st.warning(f"⚖️ **BERABERLİK** ({wins_a} - {wins_b})")
+
