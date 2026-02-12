@@ -4,7 +4,7 @@ import pandas as pd
 import time
 from datetime import datetime, timedelta
 
-# NBA Bizi Bot Sanmasın Diye Kimlik Kartı (Headers)
+# NBA Engelini Aşmak İçin Kimlik (Headers)
 custom_headers = {
     'Host': 'stats.nba.com',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0',
@@ -28,13 +28,13 @@ def get_team_roster(team_id):
 
 def get_player_stats(player_name, mode='LAST30'):
     try:
-        time.sleep(0.6) # Seri istek atıp ban yememek için bekletiyoruz
+        time.sleep(0.5) # Seri istek atıp ban yememek için minik bekleme
         
         search = players.find_players_by_full_name(player_name)
         if not search: return None
         p_id = search[0]['id']
         
-        # --- SEZON GENELİ ---
+        # --- SEZON GENELİ İSTENİRSE ---
         if mode == 'SEASON':
             stats = playercareerstats.PlayerCareerStats(player_id=p_id, headers=custom_headers).get_data_frames()[0]
             if stats.empty: return None
@@ -56,21 +56,26 @@ def get_player_stats(player_name, mode='LAST30'):
                 }
             }
             
-        # --- SON 30 GÜN (Manuel Hesaplama - En Garantisi) ---
+        # --- SON 30 GÜN (MANUEL HESAPLAMA - HİLESİZ) ---
         else:
+            # Oyuncunun maç günlüğünü çek
             gamelog = playergamelog.PlayerGameLog(player_id=p_id, season='2024-25', headers=custom_headers).get_data_frames()[0]
             
-            # Eğer son 30 gün verisi çekilemezse, çökmemek için SEZON verisini döndür (FALLBACK)
-            if gamelog.empty:
-                return get_player_stats(player_name, mode='SEASON')
+            if gamelog.empty: return None # Maç yoksa yok de, sezona dönme.
 
+            # Tarih formatını ayarla
             gamelog['GAME_DATE'] = pd.to_datetime(gamelog['GAME_DATE'], format='%b %d, %Y')
+            
+            # Bugünden 30 gün öncesini hesapla
             thirty_days_ago = datetime.now() - timedelta(days=30)
+            
+            # Sadece son 30 gün içindeki maçları al
             recent_games = gamelog[gamelog['GAME_DATE'] >= thirty_days_ago]
             
-            if recent_games.empty:
-                return get_player_stats(player_name, mode='SEASON')
+            # Eğer son 30 günde hiç maç yapmadıysa "Veri Yok" (None) dön.
+            if recent_games.empty: return None
             
+            # Ortalamaları hesapla
             gp = len(recent_games)
             mean_stats = recent_games.mean(numeric_only=True)
             
@@ -87,6 +92,7 @@ def get_player_stats(player_name, mode='LAST30'):
                     'TOV': float(mean_stats['TOV'])
                 }
             }
+
     except:
         return None
 
