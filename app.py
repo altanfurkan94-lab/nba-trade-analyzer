@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# --- KÜTÜPHANE KONTROL ---
+# --- ARKA KAPI KURULUMU ---
 try:
     import nba_api
 except ImportError:
@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="NBA Trade Analyzer", layout="wide")
 
-# --- CSS STİL (Dünkü Çalışan Tasarım) ---
+# --- CSS STİL ---
 st.markdown("""
 <style>
     thead tr th:first-child {display:none}
@@ -180,6 +180,7 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             stats_a, score_a, players_a, missing_a = analyzer.get_combined_stats(side_a, mode=mode_code)
             stats_b, score_b, players_b, missing_b = analyzer.get_combined_stats(side_b, mode=mode_code)
 
+            # 1. KARTLAR
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"<h3 style='text-align:center; color:#1f77b4'>GIDENLER (Takım A)</h3>", unsafe_allow_html=True)
@@ -192,7 +193,7 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
                             <div class="player-name">{p['name']}</div>
                             <div class="badge-container">{get_badges_html(p['stats'])}</div>
                         </div>""", unsafe_allow_html=True)
-                if missing_a: st.error(f"⚠️ Veri Yok: {', '.join(missing_a)}")
+                if missing_a: st.error(f"⚠️ Son 30 Günde Maçı Yok: {', '.join(missing_a)}")
 
             with c2:
                 st.markdown(f"<h3 style='text-align:center; color:#ff7f0e'>GELENLER (Takım B)</h3>", unsafe_allow_html=True)
@@ -205,14 +206,16 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
                             <div class="player-name">{p['name']}</div>
                             <div class="badge-container">{get_badges_html(p['stats'])}</div>
                         </div>""", unsafe_allow_html=True)
-                if missing_b: st.error(f"⚠️ Veri Yok: {', '.join(missing_b)}")
+                if missing_b: st.error(f"⚠️ Son 30 Günde Maçı Yok: {', '.join(missing_b)}")
             
             st.divider()
             
+            # 2. GRAFİKLER
             g1, g2 = st.columns([1,1.5])
             with g1: st.plotly_chart(plot_gauge_chart(score_a, score_b), use_container_width=True)
             with g2: st.plotly_chart(plot_radar_chart(stats_a, stats_b, cats_all), use_container_width=True)
 
+            # 3. NET DEĞİŞİM
             st.subheader("📈 Net Değişim")
             delta_cols = st.columns(9)
             wins_a, wins_b = 0, 0
@@ -231,15 +234,13 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
 
             st.divider()
 
-            # --- TABLO KISMI ---
-            # İŞTE İSTEDİĞİN ATTEMPT'LERİ BURAYA EKLEDİM
+            # 4. TABLO (ATTEMPTS EKLİ)
             ct, cc = st.columns([1.5, 0.1])
             data = []
             for cat in cats_all:
                 is_punted = cat in punt_cats
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
                 
-                # Sadece bu kısmı değiştirdim, gerisi eski halinin aynısı:
                 if cat == 'FG%':
                     str_a = f"%{val_a*100:.1f} ({stats_a.get('FGM',0):.1f}/{stats_a.get('FGA',0):.1f})"
                     str_b = f"%{val_b*100:.1f} ({stats_b.get('FGM',0):.1f}/{stats_b.get('FGA',0):.1f})"
