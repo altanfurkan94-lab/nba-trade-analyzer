@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# --- OTOMATİK KURULUM ---
+# --- KÜTÜPHANE KONTROL ---
 try:
     import nba_api
 except ImportError:
@@ -15,14 +15,13 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="NBA Trade Analyzer", layout="wide")
 
-# --- CSS STİL ---
+# --- CSS STİL (Dünkü Çalışan Tasarım) ---
 st.markdown("""
 <style>
     thead tr th:first-child {display:none}
     tbody th {display:none}
     .stDataFrame {font-size: 1.1rem;}
     
-    /* Kart Tasarımı - Büyük Fotoğraflar */
     .player-card {
         background-color: #262730;
         border-radius: 10px;
@@ -57,7 +56,6 @@ st.markdown("""
 st.title("🏀 NBA Fantasy Trade Analyzer")
 st.markdown('<div class="intro-box">"Bu sayfa değerli ligimizin değerli komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi için oluşturulmuştur."</div>', unsafe_allow_html=True)
 
-# LİSTELERİ TUT (Session State)
 if 'team_a_package' not in st.session_state: st.session_state.team_a_package = []
 if 'team_b_package' not in st.session_state: st.session_state.team_b_package = []
 
@@ -76,7 +74,7 @@ mode_code = 'LAST30' if analysis_mode == "Son 30 Gün" else 'SEASON'
 
 st.sidebar.divider()
 
-# --- TAKIM A ---
+# TAKIM A
 st.sidebar.markdown("### 🟢 Takım A (Gidenler)")
 team_a_select = st.sidebar.selectbox("Takım Seç (A)", team_names, key="sel_a")
 roster_a = analyzer.get_team_roster(nba_teams_dict[team_a_select])
@@ -97,7 +95,7 @@ if st.session_state.team_a_package:
 
 st.sidebar.markdown("---")
 
-# --- TAKIM B ---
+# TAKIM B
 st.sidebar.markdown("### 🔵 Takım B (Gelenler)")
 team_b_select = st.sidebar.selectbox("Takım Seç (B)", team_names, index=1, key="sel_b")
 roster_b = analyzer.get_team_roster(nba_teams_dict[team_b_select])
@@ -170,7 +168,7 @@ def plot_gauge_chart(score_a, score_b):
     fig.update_layout(height=250, margin=dict(l=20,r=20,t=30,b=20), paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
     return fig
 
-# --- ANALİZ ---
+# --- ANALİZ ET ---
 if st.sidebar.button("ANALİZ ET", type="primary"):
     side_a = st.session_state.team_a_package
     side_b = st.session_state.team_b_package
@@ -182,7 +180,6 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             stats_a, score_a, players_a, missing_a = analyzer.get_combined_stats(side_a, mode=mode_code)
             stats_b, score_b, players_b, missing_b = analyzer.get_combined_stats(side_b, mode=mode_code)
 
-            # 1. KARTLAR (BÜYÜK FOTO)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"<h3 style='text-align:center; color:#1f77b4'>GIDENLER (Takım A)</h3>", unsafe_allow_html=True)
@@ -212,14 +209,13 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             
             st.divider()
             
-            # 2. GRAFİKLER
             g1, g2 = st.columns([1,1.5])
             with g1: st.plotly_chart(plot_gauge_chart(score_a, score_b), use_container_width=True)
             with g2: st.plotly_chart(plot_radar_chart(stats_a, stats_b, cats_all), use_container_width=True)
 
-            # 3. NET DEĞİŞİM
             st.subheader("📈 Net Değişim")
             delta_cols = st.columns(9)
+            wins_a, wins_b = 0, 0
             for idx, cat in enumerate(cats_all):
                 if cat in punt_cats: continue
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
@@ -230,21 +226,20 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
                 if cat in ['FG%', 'FT%']: fmt_diff = f"{(val_a-val_b)*100:+.1f}%"
                 
                 is_pos = (val_a > val_b) if cat != 'TOV' else (val_a < val_b)
-                
                 with delta_cols[idx]:
                     st.metric(label=cat, value=fmt_diff, delta=fmt_diff, delta_color="normal" if is_pos else "inverse")
 
             st.divider()
 
-            # 4. TABLO (ATTEMPTS EKLİ)
+            # --- TABLO KISMI ---
+            # İŞTE İSTEDİĞİN ATTEMPT'LERİ BURAYA EKLEDİM
             ct, cc = st.columns([1.5, 0.1])
             data = []
-            wins_a, wins_b = 0, 0
             for cat in cats_all:
                 is_punted = cat in punt_cats
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
                 
-                # İSABETLER BURADA EKLENİYOR
+                # Sadece bu kısmı değiştirdim, gerisi eski halinin aynısı:
                 if cat == 'FG%':
                     str_a = f"%{val_a*100:.1f} ({stats_a.get('FGM',0):.1f}/{stats_a.get('FGA',0):.1f})"
                     str_b = f"%{val_b*100:.1f} ({stats_b.get('FGM',0):.1f}/{stats_b.get('FGA',0):.1f})"
