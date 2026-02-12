@@ -20,22 +20,25 @@ def get_player_stats(player_name, mode='LAST30'):
         if mode == 'SEASON':
             stats = playercareerstats.PlayerCareerStats(player_id=p_id).get_data_frames()[0]
             latest = stats.iloc[-1]
+            gp = float(latest['GP'])
             return {
                 'id': p_id,
                 'name': player_name,
-                'games': int(latest['GP']),
+                'games': int(gp),
                 'stats': {
                     'FG%': float(latest['FG_PCT']),
-                    'FGA': float(latest['FGA']) / float(latest['GP']),
+                    'FGM': float(latest['FGM']) / gp,
+                    'FGA': float(latest['FGA']) / gp,
                     'FT%': float(latest['FT_PCT']),
-                    'FTA': float(latest['FTA']) / float(latest['GP']),
-                    '3PTM': float(latest['FG3M']) / float(latest['GP']),
-                    'PTS': float(latest['PTS']) / float(latest['GP']),
-                    'REB': float(latest['REB']) / float(latest['GP']),
-                    'AST': float(latest['AST']) / float(latest['GP']),
-                    'STL': float(latest['STL']) / float(latest['GP']),
-                    'BLK': float(latest['BLK']) / float(latest['GP']),
-                    'TOV': float(latest['TOV']) / float(latest['GP'])
+                    'FTM': float(latest['FTM']) / gp,
+                    'FTA': float(latest['FTA']) / gp,
+                    '3PTM': float(latest['FG3M']) / gp,
+                    'PTS': float(latest['PTS']) / gp,
+                    'REB': float(latest['REB']) / gp,
+                    'AST': float(latest['AST']) / gp,
+                    'STL': float(latest['STL']) / gp,
+                    'BLK': float(latest['BLK']) / gp,
+                    'TOV': float(latest['TOV']) / gp
                 }
             }
         else:
@@ -50,8 +53,10 @@ def get_player_stats(player_name, mode='LAST30'):
                 'games': int(latest['GP']),
                 'stats': {
                     'FG%': float(latest['FG_PCT']),
+                    'FGM': float(latest['FGM']),
                     'FGA': float(latest['FGA']),
                     'FT%': float(latest['FT_PCT']),
+                    'FTM': float(latest['FTM']),
                     'FTA': float(latest['FTA']),
                     '3PTM': float(latest['FG3M']),
                     'PTS': float(latest['PTS']),
@@ -72,20 +77,20 @@ def get_combined_stats(player_names, mode='LAST30'):
         s = get_player_stats(name, mode)
         if s: all_stats.append(s)
         else: missing.append(name)
-        time.sleep(0.5)
+        time.sleep(0.6) # NBA sunucularını yormayalım
     
     if not all_stats: return {}, 0, [], missing
     
-    combined = {cat: 0 for cat in ['FG%', 'FGA', 'FT%', 'FTA', '3PTM', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']}
+    cats = ['FGM', 'FGA', 'FTM', 'FTA', '3PTM', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']
+    combined = {cat: 0 for cat in cats}
     for p in all_stats:
-        for cat in combined:
+        for cat in cats:
             combined[cat] += p['stats'][cat]
     
-    # Ortalama yüzdeler (Ağırlıklı değil, basit toplam üzerinden)
-    combined['FG%'] /= len(all_stats)
-    combined['FT%'] /= len(all_stats)
+    # Yüzdeleri isabet/deneme üzerinden tekrar hesaplıyoruz (daha doğru sonuç verir)
+    combined['FG%'] = combined['FGM'] / combined['FGA'] if combined['FGA'] > 0 else 0
+    combined['FT%'] = combined['FTM'] / combined['FTA'] if combined['FTA'] > 0 else 0
     
-    # Basit bir skor hesaplama
     score = (combined['PTS'] * 1.0 + combined['REB'] * 1.2 + combined['AST'] * 1.5 + 
              combined['STL'] * 3 + combined['BLK'] * 3 - combined['TOV'] * 2)
     
