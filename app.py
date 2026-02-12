@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# --- KÜTÜPHANE YÜKLEME ---
+# --- OTOMATİK KURULUM ---
 try:
     import nba_api
 except ImportError:
@@ -21,10 +21,12 @@ st.markdown("""
     thead tr th:first-child {display:none}
     tbody th {display:none}
     .stDataFrame {font-size: 1.1rem;}
+    
+    /* Kart Tasarımı - Büyük Fotoğraflar */
     .player-card {
         background-color: #262730;
         border-radius: 10px;
-        padding: 0px; /* Fotoğraf tam sığsın diye */
+        padding: 0px; 
         text-align: center;
         margin-bottom: 20px;
         border: 1px solid #444;
@@ -53,9 +55,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🏀 NBA Fantasy Trade Analyzer")
-st.markdown('<div class="intro-box">"Bu sayfa değerli ligimizin değerli üyelerinin ve komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi için oluşturulmuştur. Umarım ki yardımı dokunur."</div>', unsafe_allow_html=True)
+st.markdown('<div class="intro-box">"Bu sayfa değerli ligimizin değerli komisyonerlerinin takaslardaki farkları daha net şekilde görebilmesi için oluşturulmuştur."</div>', unsafe_allow_html=True)
 
-# LİSTELERİ SIFIRLAMA (Hafıza)
+# LİSTELERİ TUT (Session State)
 if 'team_a_package' not in st.session_state: st.session_state.team_a_package = []
 if 'team_b_package' not in st.session_state: st.session_state.team_b_package = []
 
@@ -67,14 +69,14 @@ def load_nba_teams():
 nba_teams_dict = load_nba_teams()
 team_names = sorted(list(nba_teams_dict.keys()))
 
-# --- SIDEBAR ---
+# --- SIDEBAR (EKLE BUTONLU SİSTEM) ---
 st.sidebar.header("🛠️ Ayarlar")
 analysis_mode = st.sidebar.radio("Analiz Aralığı:", ("Sezon Geneli", "Son 30 Gün"), index=1)
 mode_code = 'LAST30' if analysis_mode == "Son 30 Gün" else 'SEASON'
 
 st.sidebar.divider()
 
-# --- TAKIM A (EKLE BUTONLU SİSTEM) ---
+# --- TAKIM A ---
 st.sidebar.markdown("### 🟢 Takım A (Gidenler)")
 team_a_select = st.sidebar.selectbox("Takım Seç (A)", team_names, key="sel_a")
 roster_a = analyzer.get_team_roster(nba_teams_dict[team_a_select])
@@ -88,7 +90,6 @@ if st.sidebar.button("➕ Listeye Ekle (A)", key="btn_add_a"):
 st.sidebar.markdown("**📦 Paket A Listesi:**")
 if st.session_state.team_a_package:
     for p in st.session_state.team_a_package: st.sidebar.markdown(f"- {p}")
-    # Silme işlemi
     rem_a = st.sidebar.selectbox("Çıkar (A):", ["Seçiniz..."]+st.session_state.team_a_package, key="rem_a")
     if st.sidebar.button("🗑️ Sil (A)", key="del_a"):
         if rem_a != "Seçiniz...": st.session_state.team_a_package.remove(rem_a); st.rerun()
@@ -96,7 +97,7 @@ if st.session_state.team_a_package:
 
 st.sidebar.markdown("---")
 
-# --- TAKIM B (EKLE BUTONLU SİSTEM) ---
+# --- TAKIM B ---
 st.sidebar.markdown("### 🔵 Takım B (Gelenler)")
 team_b_select = st.sidebar.selectbox("Takım Seç (B)", team_names, index=1, key="sel_b")
 roster_b = analyzer.get_team_roster(nba_teams_dict[team_b_select])
@@ -110,7 +111,6 @@ if st.sidebar.button("➕ Listeye Ekle (B)", key="btn_add_b"):
 st.sidebar.markdown("**📦 Paket B Listesi:**")
 if st.session_state.team_b_package:
     for p in st.session_state.team_b_package: st.sidebar.markdown(f"- {p}")
-    # Silme işlemi
     rem_b = st.sidebar.selectbox("Çıkar (B):", ["Seçiniz..."]+st.session_state.team_b_package, key="rem_b")
     if st.sidebar.button("🗑️ Sil (B)", key="del_b"):
         if rem_b != "Seçiniz...": st.session_state.team_b_package.remove(rem_b); st.rerun()
@@ -170,7 +170,7 @@ def plot_gauge_chart(score_a, score_b):
     fig.update_layout(height=250, margin=dict(l=20,r=20,t=30,b=20), paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
     return fig
 
-# --- ANALİZ İŞLEMİ ---
+# --- ANALİZ ---
 if st.sidebar.button("ANALİZ ET", type="primary"):
     side_a = st.session_state.team_a_package
     side_b = st.session_state.team_b_package
@@ -217,10 +217,9 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
             with g1: st.plotly_chart(plot_gauge_chart(score_a, score_b), use_container_width=True)
             with g2: st.plotly_chart(plot_radar_chart(stats_a, stats_b, cats_all), use_container_width=True)
 
-            # 3. NET DEĞİŞİM (+/-)
+            # 3. NET DEĞİŞİM
             st.subheader("📈 Net Değişim")
             delta_cols = st.columns(9)
-            wins_a, wins_b = 0, 0
             for idx, cat in enumerate(cats_all):
                 if cat in punt_cats: continue
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
@@ -237,14 +236,15 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
 
             st.divider()
 
-            # 4. TABLO (İSABET/DENEME EKLİ)
+            # 4. TABLO (ATTEMPTS EKLİ)
             ct, cc = st.columns([1.5, 0.1])
             data = []
+            wins_a, wins_b = 0, 0
             for cat in cats_all:
                 is_punted = cat in punt_cats
                 val_a, val_b = stats_a.get(cat, 0), stats_b.get(cat, 0)
                 
-                # İSABET GÖSTERGESİ
+                # İSABETLER BURADA EKLENİYOR
                 if cat == 'FG%':
                     str_a = f"%{val_a*100:.1f} ({stats_a.get('FGM',0):.1f}/{stats_a.get('FGA',0):.1f})"
                     str_b = f"%{val_b*100:.1f} ({stats_b.get('FGM',0):.1f}/{stats_b.get('FGA',0):.1f})"
