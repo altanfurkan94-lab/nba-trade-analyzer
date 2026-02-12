@@ -67,14 +67,14 @@ def load_nba_teams():
 nba_teams_dict = load_nba_teams()
 team_names = sorted(list(nba_teams_dict.keys()))
 
-# --- SIDEBAR (EKLE BUTONLU SİSTEM) ---
+# --- SIDEBAR ---
 st.sidebar.header("🛠️ Ayarlar")
 analysis_mode = st.sidebar.radio("Analiz Aralığı:", ("Sezon Geneli", "Son 30 Gün"), index=1)
 mode_code = 'LAST30' if analysis_mode == "Son 30 Gün" else 'SEASON'
 
 st.sidebar.divider()
 
-# TAKIM A
+# --- TAKIM A ---
 st.sidebar.markdown("### 🟢 Takım A (Gidenler)")
 team_a_select = st.sidebar.selectbox("Takım Seç (A)", team_names, key="sel_a")
 roster_a = analyzer.get_team_roster(nba_teams_dict[team_a_select])
@@ -95,7 +95,7 @@ if st.session_state.team_a_package:
 
 st.sidebar.markdown("---")
 
-# TAKIM B
+# --- TAKIM B (BURASI DÜZELTİLDİ - ARTIK GÖRÜNECEK) ---
 st.sidebar.markdown("### 🔵 Takım B (Gelenler)")
 team_b_select = st.sidebar.selectbox("Takım Seç (B)", team_names, index=1, key="sel_b")
 roster_b = analyzer.get_team_roster(nba_teams_dict[team_b_select])
@@ -193,7 +193,7 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
                             <div class="player-name">{p['name']}</div>
                             <div class="badge-container">{get_badges_html(p['stats'])}</div>
                         </div>""", unsafe_allow_html=True)
-                if missing_a: st.error(f"⚠️ Son 30 Günde Maçı Yok: {', '.join(missing_a)}")
+                if missing_a: st.error(f"⚠️ Veri Yok: {', '.join(missing_a)}")
 
             with c2:
                 st.markdown(f"<h3 style='text-align:center; color:#ff7f0e'>GELENLER (Takım B)</h3>", unsafe_allow_html=True)
@@ -206,16 +206,14 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
                             <div class="player-name">{p['name']}</div>
                             <div class="badge-container">{get_badges_html(p['stats'])}</div>
                         </div>""", unsafe_allow_html=True)
-                if missing_b: st.error(f"⚠️ Son 30 Günde Maçı Yok: {', '.join(missing_b)}")
+                if missing_b: st.error(f"⚠️ Veri Yok: {', '.join(missing_b)}")
             
             st.divider()
             
-            # 2. GRAFİKLER
             g1, g2 = st.columns([1,1.5])
             with g1: st.plotly_chart(plot_gauge_chart(score_a, score_b), use_container_width=True)
             with g2: st.plotly_chart(plot_radar_chart(stats_a, stats_b, cats_all), use_container_width=True)
 
-            # 3. NET DEĞİŞİM
             st.subheader("📈 Net Değişim")
             delta_cols = st.columns(9)
             wins_a, wins_b = 0, 0
@@ -234,7 +232,7 @@ if st.sidebar.button("ANALİZ ET", type="primary"):
 
             st.divider()
 
-            # 4. TABLO (ATTEMPTS EKLİ)
+            # --- TABLO ---
             ct, cc = st.columns([1.5, 0.1])
             data = []
             for cat in cats_all:
